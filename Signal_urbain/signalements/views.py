@@ -82,7 +82,7 @@ def create_signalement(request):
     else:
         form = SignalementForm()
     
-    return render(request, 'signalements/create.html', {'form': form})
+    return render(request, 'signalements/list.html', {'form': form})
 
 @login_required
 def update_signalement(request, pk):
