@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ signalement.titre }} - Signal Urbain{% endblock %}
+
+{% block extra_css %}
+<style>
+    #map {
+        height: 300px;
+        width: 100%;
+        border-radius: 0.375rem;
+    }
+    .signalement-image {
+        max-height: 400px;
+        object-fit: cover;
+        width: 100%;
+        border-radius: 0.375rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Image et Carte -->
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                {% if signalement.images %}
+                    <img src="{{ signalement.images.url }}" alt="Image du signalement" 
+                         class="signalement-image mb-4">
+                {% endif %}
+                
+                <div id="map"></div>
+            </div>
+        </div>
+
+        <!-- Informations principales -->
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <h1 class="h3 mb-3">{{ signalement.titre }}</h1>
+                
+                <div class="mb-4">
+                    <span class="badge bg-{% if signalement.status == 'EN_ATTENTE' %}warning
+                                   {% elif signalement.status == 'EN_COURS' %}info
+                                   {% elif signalement.status == 'RESOLU' %}success
+                                   {% else %}danger{% endif %} mb-2">
+                        {{ signalement.get_status_display }}
+                    </span>
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-map-marker-alt"></i> {{ signalement.adresse }}
+                    </p>
+                </div>
+                
+                <h5 class="mb-3">Description</h5>
+                <p class="mb-4">{{ signalement.description|linebreaks }}</p>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted">
+                            Signalé par {{ signalement.createur.username }}
+                        </small>
+                        <br>
+                        <small class="text-muted">
+                            Le {{ signalement.date_creation|date:"d/m/Y à H:i" }}
+                        </small>
+                    </div>
+                    <div>
+                        {% if user.is_authenticated %}
+                            <form method="post" action="{% url 'signalements:vote' signalement.id %}" 
+                                  class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-primary">
+                                    <i class="fas {% if user in signalement.votes.all %}fa-thumbs-down{% else %}fa-thumbs-up{% endif %}"></i>
+                                    {{ signalement.nombre_votes }}
+                                </button>
+                            </form>
+                        {% endif %}
+                        
+                        {% if user == signalement.createur or user.is_staff %}
+                            <a href="{% url 'signalements:update' signalement.id %}" 
+                               class="btn btn-outline-secondary">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <button type="button" class="btn btn-outline-danger" 
+                                    data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Commentaires (fonctionnalité future) -->
+        <div class="card shadow">
+            <div class="card-body">
+                <h5 class="mb-3">Commentaires</h5>
+                <p class="text-muted text-center">
+                    Les commentaires seront disponibles prochainement.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Statut et Progression -->
+        <div class="card shadow mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Suivi du signalement</h5>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <i class="fas fa-circle text-success"></i>
+                        <div class="ms-3">
+                            <p class="mb-1">Signalement créé</p>
+                            <small class="text-muted">
+                                {{ signalement.date_creation|date:"d/m/Y" }}
+                            </small>
+                        </div>
+                    </div>
+                    {% if signalement.status != 'EN_ATTENTE' %}
+                        <div class="timeline-item">
+                            <i class="fas fa-circle {% if signalement.status == 'EN_COURS' %}text-info{% else %}text-muted{% endif %}"></i>
+                            <div class="ms-3">
+                                <p class="mb-1">En cours de traitement</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                    {% if signalement.status == 'RESOLU' %}
+                        <div class="timeline-item">
+                            <i class="fas fa-circle text-success"></i>
+                            <div class="ms-3">
+                                <p class="mb-1">Problème résolu</p>
+                                <small class="text-muted">
+                                    {{ signalement.date_modification|date:"d/m/Y" }}
+                                </small>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Signalements similaires -->
+        <div class="card shadow">
+            <div class="card-body">
+                <h5 class="card-title">Signalements similaires</h5>
+                {% if signalements_similaires %}
+                    <div class="list-group list-group-flush">
+                        {% for s in signalements_similaires %}
+                            <a href="{% url 'signalements:detail' s.id %}" 
+                               class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ s.titre|truncatechars:30 }}</h6>
+                                    <small class="text-muted">{{ s.date_creation|timesince }}</small>
+                                </div>
+                                <p class="mb-1 text-muted small">{{ s.adresse|truncatechars:50 }}</p>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center mb-0">
+                        Aucun signalement similaire trouvé
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmation de suppression -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmer la suppression</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Êtes-vous sûr de vouloir supprimer ce signalement ?
+                Cette action est irréversible.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <form method="post" action="{% url 'signalements:delete' signalement.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Supprimer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Initialisation de la carte
+    var map = L.map('map').setView([{{ signalement.latitude }}, {{ signalement.longitude }}], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Ajout du marqueur
+    L.marker([{{ signalement.latitude }}, {{ signalement.longitude }}])
+        .addTo(map)
+        .bindPopup("{{ signalement.titre|escapejs }}");
+</script>
+{% endblock %} 
